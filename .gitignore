@@ -1,0 +1,6 @@
+*.o
+fernmelder
+*.out
+*.lst
+*.txt
+*.ips
