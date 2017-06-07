@@ -1,6 +1,8 @@
 *.o
 fernmelder
+*.in
 *.out
 *.lst
 *.txt
 *.ips
+*.fqdn
