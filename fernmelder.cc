@@ -45,7 +45,6 @@ void usage()
 	exit(1);
 }
 
-
 int main(int argc, char **argv)
 {
 	DNS *dns = NULL;
@@ -161,10 +160,10 @@ int main(int argc, char **argv)
 				for (auto i = result.begin(); i != result.end(); ++i) {
 					// only print resolved IP's, no CNAME or NXDOMAIN
 					if (A_only) {
-						if (i->first.find("A\t") == string::npos)
+						if (i->first.find("\"type\": \"A\"") == string::npos)
 							continue;
 					}
-					cout<<name<<"\t\t"<<i->first<<"\t"<<i->second<<endl;
+					cout<<name<<i->first<<i->second<<endl;
 				}
 			} else {
 				if (!eof)

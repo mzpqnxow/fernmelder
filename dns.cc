@@ -46,6 +46,15 @@ using namespace net_headers;
 const uint8_t dns_max_label = 63;
 
 
+char *json_string_field(char *name, char *value, bool last_element);
+
+char *json_string_field(char *name, char *value, bool last_element) {
+	char *buf;
+	buf = (char *)malloc(strlen(name) + strlen(value) + 32);
+	sprintf(buf, "\"%s\": \"%s\"%s", name, value, last_element ? "}" : ", ");
+	return buf;
+}
+
 /*  "\003foo\003bar\000" -> foo.bar
  */
 int qname2host(const string &msg, string &result)
@@ -285,6 +294,8 @@ int DNS::parse_response(const string &msg, string &name, multimap<string, string
 
 	name = fqdn;
 
+	name = "{\"fqdn\": \"" + fqdn + "\", ";
+
 	auto it = xid2name.find(hdr->id);
 	if (it != xid2name.end()) {
 		if (name.find(it->second) == string::npos) {
@@ -296,7 +307,8 @@ int DNS::parse_response(const string &msg, string &name, multimap<string, string
 	}
 
 	if (hdr->rcode != 0) {
-		result.insert(pair<string, string>("0\tIN", "NXDOMAIN"));
+		// result.insert(pair<string, string>("\"ttl\": 0, ", "\"type\": \"NXDOMAIN\", "));
+		result.insert(pair<string, string>(json_string_field("ttl", "0", false), json_string_field("type", "NXDOMAIN", true)));
 		return 1;
 	}
 
@@ -329,15 +341,23 @@ int DNS::parse_response(const string &msg, string &name, multimap<string, string
 
 		memset(ttl, 0, sizeof(ttl));
 		snprintf(ttl, sizeof(ttl), "%d", ntohl(rr->ttl));
-		s = ttl;
-		s += "\tIN\t";
-
+		s = "\"ttl\": ";
+		s += ttl;
+		s += ", ";
+		// s += "\tIN\t";
+		//s += "\"type\": ";
+		char json_ip_buf[2048];
 		if (rr->type == htons(dns_type::A)) {
 			memset(ip_buf, 0, sizeof(ip_buf));
 			memcpy(&in.s_addr, idx, sizeof(in.s_addr));
 			inet_ntop(AF_INET, &in, ip_buf, sizeof(ip_buf));
-			s += "A\t";
-			result.insert(pair<string, string>(s,  ip_buf));
+			snprintf(json_ip_buf, sizeof(json_ip_buf) - 1, "\"ip\": \"%s\"}", ip_buf);
+			//s += "\"A\", ";
+
+			s += json_string_field("type", "A", false);
+
+
+			result.insert(pair<string, string>(s, json_ip_buf));
 		} else if (rr->type == htons(dns_type::CNAME)) {
 			fqdn = "";
 			if ((nl = qname2host(string(idx, ntohs(rr->len)), fqdn)) < 0)
@@ -348,17 +368,28 @@ int DNS::parse_response(const string &msg, string &name, multimap<string, string
 				ns_name_uncompress(reinterpret_cast<const unsigned char*>(msg.c_str()),
 				                   reinterpret_cast<const unsigned char*>(msg.c_str() + msg.size() + 1),
 				                   reinterpret_cast<const unsigned char*>(idx), exp_dn, sizeof(exp_dn));
-				fqdn = string(exp_dn);
-				fqdn += ".";
+				// fqdn = "\"fqdn\": \"" + string(exp_dn) + "\"";
+				fqdn = json_string_field("fqdn", exp_dn, true);
+				// fqdn += ".";
 			}
-			s += "CNAME\t";
+			s += "\"type\": \"CNAME\", ";
 			result.insert(pair<string, string>(s, fqdn));
 		} else if (rr->type == htons(dns_type::AAAA)) {
 			memset(ip_buf, 0, sizeof(ip_buf));
 			memcpy(&in6, idx, sizeof(in6));
 			inet_ntop(AF_INET6, &in6, ip_buf, sizeof(ip_buf));
-			s += "AAAA\t";
-			result.insert(pair<string, string>(s,  ip_buf));
+			//ip_buf = ip_buf;
+			//ip_buf = ip_buf + "\"ip\": \"";
+			// snprintf(json_ip_buf, sizeof(json_ip_buf) - 1, "\"ip\": \"%s\"}", ip_buf);
+
+			//json_ip_buf = ;
+			// + "\"}";
+			//s += "\"type\": \"AAAA\", ";
+
+			s += json_string_field("type", "AAAA", false);
+
+			// result.insert(pair<string, string>(s,  ip_buf));
+			result.insert(pair<string, string>(s,  json_string_field("ip", ip_buf, true)));
 		}
 
 		idx += ntohs(rr->len);
